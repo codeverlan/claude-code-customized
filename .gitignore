@@ -1,0 +1,59 @@
+# Environment files with sensitive data
+.env
+*.env.local
+*.env.production
+
+# Claude binary files
+claude-binary/
+*.claude-binary
+claude-code-linux-x64
+claude-code-macos-x64
+claude-code-windows-x64.exe
+
+# Docker volumes and data
+projects-data/
+claude-config/
+mcp-config/
+*.log
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+node_modules/
+
+# Build artifacts
+*.tar
+*.tar.gz
+*.zip
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Claude Code session data
+.claude/session-*
+.claude/cache/
+.claude/logs/
+
+# MCP server data
+.mcp/cache/
+.mcp/logs/
+
+# Test outputs
+test-results/
+coverage/
+
+# Backup files
+*.bak
+*.backup
+*.old

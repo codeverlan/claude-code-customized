@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  claude-custom:
+    # Uncomment build section for local development
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile.volume-mount
+
+    # Use Docker Hub image for production
+    image: thornlcsw/claude-code-customized:latest
+    container_name: claude-code-workspace
+    stdin_open: true
+    tty: true
+    working_dir: /workspace
+    environment:
+      - ANTHROPIC_AUTH_TOKEN=${ANTHROPIC_AUTH_TOKEN}
+      - ANTHROPIC_BASE_URL=${ANTHROPIC_BASE_URL:-https://api.anthropic.com}
+      - CLAUDE_DEFAULT_BASE_PROMPT=base/core-enhancement.md
+      - CLAUDE_AUTO_COMPACT_BUFFER_RATIO=0.05
+      - CLAUDE_CONTEXT_AUTOCOMPACT_TARGET=5%
+      - CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1
+      - CLAUDE_CODE_SESSION=1
+      - CLAUDE_CODE_ENTRYPOINT=cli
+      - CLAUDECODE=1
+    volumes:
+      # Mount your Claude binary (Linux binary required)
+      - ./claude-binary:/claude-binaries:ro
+
+      # Mount your working directory
+      - .:/workspace
+
+      # Optional: Mount host Claude configurations
+      - ~/.claude:/host-claude:ro
+
+      # Persist customizations
+      - claude-customizations:/home/claude/projects
+
+    ports:
+      - "8080:8080"  # If using web-based tools
+
+    restart: unless-stopped
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "/bin/bash", "-c", "test -f /home/claude/.local/bin/claude && test -d /home/claude/projects"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  claude-customizations:
+    driver: local
+    name: claude-code-customizations

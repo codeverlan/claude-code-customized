@@ -1,0 +1,133 @@
+# Claude Code Customizations - Volume Mount Approach
+# Runs Claude Code with customizations, binary mounted from host
+
+FROM ubuntu:22.04
+
+# Set non-interactive frontend for apt
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    wget \
+    git \
+    vim \
+    nodejs \
+    npm \
+    bash \
+    ca-certificates \
+    unzip \
+    tar \
+    sudo \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create user with passwordless sudo
+ENV USER=claude
+ENV HOME=/home/claude
+ENV CLAUDE_USER=claude
+RUN useradd -m -s /bin/bash $USER && \
+    echo "$USER ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+
+# Set working directory
+WORKDIR $HOME
+
+# Set environment variables for Claude Code
+ENV CLAUDE_CODE_SESSION=1
+ENV CLAUDE_CODE_ENTRYPOINT=cli
+ENV CLAUDECODE=1
+ENV CLAUDE_AUTO_COMPACT_BUFFER_RATIO=0.05
+ENV CLAUDE_CONTEXT_AUTOCOMPACT_TARGET=5%
+ENV CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1
+ENV CLAUDE_SYSTEM_PROMPT_DIR=$HOME/projects/claude-system-prompts
+ENV CLAUDE_DEFAULT_BASE_PROMPT=base/core-enhancement.md
+ENV CLAUDE_SUDO_ESCALATION_ENABLED=1
+ENV CLAUDE_AUTO_ESCALATE_ON_PERMISSION_ERROR=1
+ENV PATH="$PATH:$HOME/.local/bin:$HOME/projects/claude-system-prompts/scripts"
+
+# Create .claude directory structure
+RUN mkdir -p $HOME/.claude/{commands,skills,hooks,agents,projects,session-env,system-prompts/{base,append,context,domains,core,scripts},todos}
+RUN mkdir -p $HOME/.local/bin
+
+# Copy optimized settings
+COPY settings.json.template $HOME/.claude/settings.json
+
+# Copy system prompt management scripts
+COPY claude-system-prompts/ $HOME/projects/claude-system-prompts/
+RUN chmod +x $HOME/projects/claude-system-prompts/scripts/*.sh
+
+# Copy slash commands
+COPY claude-commands/ $HOME/.claude/commands/
+
+# Copy setup script
+COPY setup-claude-customizations.sh /usr/local/bin/setup-claude-customizations.sh
+RUN chmod +x /usr/local/bin/setup-claude-customizations.sh
+
+# Copy README for projects directory
+COPY README-projects.md $HOME/projects/README.md
+
+# Create projects directory and symlinks
+RUN mkdir -p $HOME/projects && \
+    mkdir -p $HOME/.config/mcp && \
+    ln -sf $HOME/.claude/commands $HOME/projects/claude-commands && \
+    ln -sf $HOME/.claude/skills $HOME/projects/claude-skills && \
+    ln -sf $HOME/.claude/hooks $HOME/projects/claude-hooks && \
+    ln -sf $HOME/.claude/agents $HOME/projects/claude-agents && \
+    ln -sf $HOME/.claude/todos $HOME/projects/claude-todos && \
+    ln -sf $HOME/.claude/projects $HOME/projects/claude-projects && \
+    ln -sf $HOME/.claude/session-env $HOME/projects/claude-sessions && \
+    ln -sf $HOME/.claude/system-prompts $HOME/projects/claude-system-prompts && \
+    ln -sf $HOME/.config/mcp $HOME/projects/mcp-config
+
+# Create a startup script that mounts the Claude binary and sets up sudo escalation
+RUN cat > /usr/local/bin/start-claude.sh << 'EOF'
+#!/bin/bash
+
+# Check if Claude binary is available
+if [ -f "/claude-binaries/claude" ]; then
+    cp /claude-binaries/claude $HOME/.local/bin/claude
+    chmod +x $HOME/.local/bin/claude
+    echo "Claude Code binary mounted successfully"
+else
+    echo "Claude Code binary not found. Please mount it to /claude-binaries/"
+fi
+
+# Test passwordless sudo
+echo "Testing passwordless sudo configuration..."
+if sudo -n true 2>/dev/null; then
+    echo "✅ Passwordless sudo is properly configured"
+else
+    echo "❌ Passwordless sudo configuration failed"
+    exit 1
+fi
+
+# Run setup
+/usr/local/bin/setup-claude-customizations.sh
+
+# Test sudo escalation scripts
+echo "Testing sudo escalation functionality..."
+if command -v task-with-sudo.sh >/dev/null 2>&1; then
+    echo "✅ Sudo escalation scripts available"
+else
+    echo "❌ Sudo escalation scripts not found in PATH"
+fi
+
+echo "Claude Code environment ready!"
+echo "Binary location: $HOME/.local/bin/claude"
+echo "Customizations: $HOME/projects/"
+echo "Sudo escalation: ENABLED"
+echo "Default base prompt: $CLAUDE_DEFAULT_BASE_PROMPT"
+EOF
+RUN chmod +x /usr/local/bin/start-claude.sh
+
+# Set proper ownership
+RUN chown -R $USER:$USER $HOME
+
+# Switch to user
+USER $USER
+
+# Expose volumes
+VOLUME $HOME/projects
+VOLUME /claude-binaries
+
+# Run startup script and then bash
+CMD ["/bin/bash", "-c", "/usr/local/bin/start-claude.sh && /bin/bash"]

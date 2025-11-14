@@ -1,0 +1,88 @@
+# Claude Code with Customizations - Simple Approach
+# Packages local Claude Code installation with all customizations
+
+FROM ubuntu:22.04
+
+# Set non-interactive frontend for apt
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    wget \
+    git \
+    vim \
+    nodejs \
+    npm \
+    bash \
+    ca-certificates \
+    unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create user
+ENV USER=claude
+ENV HOME=/home/claude
+RUN useradd -m -s /bin/bash $USER
+
+# Set working directory
+WORKDIR $HOME
+
+# Set environment variables for Claude Code
+ENV CLAUDE_CODE_SESSION=1
+ENV CLAUDE_CODE_ENTRYPOINT=cli
+ENV CLAUDECODE=1
+ENV PATH="$PATH:/home/claude/.local/bin"
+
+# Download and install Claude Code (using npm method as fallback)
+RUN npm install -g @anthropic-ai/claude-code || \
+    (curl -fsSL https://claude.ai/download/claude-code-linux-x64.zip -o claude-code.zip && \
+     unzip claude-code.zip -d /home/claude/.local && \
+     chmod +x /home/claude/.local/bin/claude)
+
+# Create .claude directory structure
+RUN mkdir -p $HOME/.claude/{commands,skills,hooks,agents,projects,session-env,system-prompts/{base,append,context,domains,core,scripts},todos}
+
+# Copy optimized settings
+COPY settings.json.template $HOME/.claude/settings.json
+
+# Copy system prompt management scripts
+COPY claude-system-prompts/ $HOME/projects/claude-system-prompts/
+RUN chmod +x $HOME/projects/claude-system-prompts/scripts/*.sh
+
+# Copy slash commands
+COPY claude-commands/ $HOME/.claude/commands/
+
+# Copy setup script
+COPY setup-claude-customizations.sh /usr/local/bin/setup-claude-customizations.sh
+RUN chmod +x /usr/local/bin/setup-claude-customizations.sh
+
+# Copy README for projects directory
+COPY README-projects.md $HOME/projects/README.md
+
+# Create projects directory and symlinks
+RUN mkdir -p $HOME/projects && \
+    mkdir -p $HOME/.config/mcp && \
+    ln -sf $HOME/.claude/commands $HOME/projects/claude-commands && \
+    ln -sf $HOME/.claude/skills $HOME/projects/claude-skills && \
+    ln -sf $HOME/.claude/hooks $HOME/projects/claude-hooks && \
+    ln -sf $HOME/.claude/agents $HOME/projects/claude-agents && \
+    ln -sf $HOME/.claude/todos $HOME/projects/claude-todos && \
+    ln -sf $HOME/.claude/projects $HOME/projects/claude-projects && \
+    ln -sf $HOME/.claude/session-env $HOME/projects/claude-sessions && \
+    ln -sf $HOME/.claude/system-prompts $HOME/projects/claude-system-prompts && \
+    ln -sf $HOME/.config/mcp $HOME/projects/mcp-config
+
+# Run setup script to configure everything
+RUN /usr/local/bin/setup-claude-customizations.sh
+
+# Set proper ownership
+RUN chown -R $USER:$USER $HOME
+
+# Switch to user
+USER $USER
+
+# Expose projects directory as volume
+VOLUME $HOME/projects
+
+# Default command
+CMD ["/bin/bash"]

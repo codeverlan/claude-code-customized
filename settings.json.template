@@ -1,0 +1,45 @@
+{
+  "alwaysThinkingEnabled": true,
+  "env": {
+    "ANTHROPIC_AUTH_TOKEN": "${ANTHROPIC_AUTH_TOKEN}",
+    "ANTHROPIC_BASE_URL": "${ANTHROPIC_BASE_URL:-https://api.anthropic.com}",
+    "API_TIMEOUT_MS": "3000000",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": 1,
+    "CLAUDE_AUTO_COMPACT_BUFFER_RATIO": "0.05",
+    "CLAUDE_CONTEXT_AUTOCOMPACT_TARGET": "5%",
+    "CLAUDE_SYSTEM_PROMPT_DIR": "${HOME}/projects/claude-system-prompts",
+    "CLAUDE_DEFAULT_BASE_PROMPT": "${CLAUDE_DEFAULT_BASE_PROMPT:-base/core-enhancement.md}",
+    "CLAUDE_DEFAULT_APPEND_PROMPTS": "${CLAUDE_DEFAULT_APPEND_PROMPTS:-}"
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"Loading system prompt configuration...\" && test -n \"$CLAUDE_DEFAULT_BASE_PROMPT\" && echo \"Base prompt: $CLAUDE_DEFAULT_BASE_PROMPT\" || true"
+          }
+        ]
+      }
+    ]
+  },
+  "includeCoAuthoredBy": false,
+  "permissions": {
+    "allow": [],
+    "deny": []
+  },
+  "systemPrompts": {
+    "enabled": true,
+    "directory": "${CLAUDE_SYSTEM_PROMPT_DIR}",
+    "defaultBasePrompt": "${CLAUDE_DEFAULT_BASE_PROMPT}",
+    "defaultAppendPrompts": "${CLAUDE_DEFAULT_APPEND_PROMPTS}",
+    "autoLoad": true,
+    "contextAwareLoading": true,
+    "validation": {
+      "enabled": true,
+      "checkConflicts": true,
+      "maxPromptSize": "50k"
+    }
+  }
+}

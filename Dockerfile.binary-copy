@@ -1,0 +1,95 @@
+# Claude Code with Customizations - Binary Copy Approach
+# Copies local Claude Code binary and applies all customizations
+
+FROM ubuntu:22.04
+
+# Set non-interactive frontend for apt
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install basic dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    wget \
+    git \
+    vim \
+    nodejs \
+    npm \
+    bash \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create user
+ENV USER=claude
+ENV HOME=/home/claude
+RUN useradd -m -s /bin/bash $USER
+
+# Set working directory
+WORKDIR $HOME
+
+# Set environment variables for Claude Code
+ENV CLAUDE_CODE_SESSION=1
+ENV CLAUDE_CODE_ENTRYPOINT=cli
+ENV CLAUDECODE=1
+ENV CLAUDE_AUTO_COMPACT_BUFFER_RATIO=0.05
+ENV CLAUDE_CONTEXT_AUTOCOMPACT_TARGET=5%
+ENV CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1
+ENV CLAUDE_SYSTEM_PROMPT_DIR=$HOME/projects/claude-system-prompts
+ENV CLAUDE_DEFAULT_BASE_PROMPT=base/core-enhancement.md
+
+# Create .claude directory structure
+RUN mkdir -p $HOME/.claude/{commands,skills,hooks,agents,projects,session-env,system-prompts/{base,append,context,domains,core,scripts},todos}
+
+# Copy local Claude Code binary (you'll need to copy it manually)
+# ADD claude-binary /usr/local/bin/claude
+
+# For now, we'll create a placeholder that shows how to copy the binary
+RUN echo '#!/bin/bash
+echo "Claude Code binary needs to be copied manually."
+echo "Please run: docker cp <path-to-claude-binary> <container>:/usr/local/bin/claude"
+echo "Then restart the container."
+' > /usr/local/bin/claude && chmod +x /usr/local/bin/claude
+
+# Copy optimized settings
+COPY settings.json.template $HOME/.claude/settings.json
+
+# Copy system prompt management scripts
+COPY claude-system-prompts/ $HOME/projects/claude-system-prompts/
+RUN chmod +x $HOME/projects/claude-system-prompts/scripts/*.sh
+
+# Copy slash commands
+COPY claude-commands/ $HOME/.claude/commands/
+
+# Copy setup script
+COPY setup-claude-customizations.sh /usr/local/bin/setup-claude-customizations.sh
+RUN chmod +x /usr/local/bin/setup-claude-customizations.sh
+
+# Copy README for projects directory
+COPY README-projects.md $HOME/projects/README.md
+
+# Create projects directory and symlinks
+RUN mkdir -p $HOME/projects && \
+    mkdir -p $HOME/.config/mcp && \
+    ln -sf $HOME/.claude/commands $HOME/projects/claude-commands && \
+    ln -sf $HOME/.claude/skills $HOME/projects/claude-skills && \
+    ln -sf $HOME/.claude/hooks $HOME/projects/claude-hooks && \
+    ln -sf $HOME/.claude/agents $HOME/projects/claude-agents && \
+    ln -sf $HOME/.claude/todos $HOME/projects/claude-todos && \
+    ln -sf $HOME/.claude/projects $HOME/projects/claude-projects && \
+    ln -sf $HOME/.claude/session-env $HOME/projects/claude-sessions && \
+    ln -sf $HOME/.claude/system-prompts $HOME/projects/claude-system-prompts && \
+    ln -sf $HOME/.config/mcp $HOME/projects/mcp-config
+
+# Run setup script to configure everything
+RUN /usr/local/bin/setup-claude-customizations.sh
+
+# Set proper ownership
+RUN chown -R $USER:$USER $HOME
+
+# Switch to user
+USER $USER
+
+# Expose projects directory as volume
+VOLUME $HOME/projects
+
+# Default command
+CMD ["/binbash"]

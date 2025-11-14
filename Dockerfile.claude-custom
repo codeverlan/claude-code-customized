@@ -1,0 +1,55 @@
+# Claude Code Customizations Docker Baseline
+# Based on customizations applied on 2025-11-14
+
+FROM claude-code:latest
+
+# Set user home directory
+ENV HOME=/home/claude
+ENV USER=claude
+
+# Create environment variables for context optimization
+ENV CLAUDE_AUTO_COMPACT_BUFFER_RATIO=0.05
+ENV CLAUDE_CONTEXT_AUTOCOMPACT_TARGET=5%
+ENV CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1
+
+# Create projects directory for centralized customization management
+RUN mkdir -p ${HOME}/projects
+
+# Create symlinks for markdown-based customization folders
+RUN ln -sf ${HOME}/.claude/commands ${HOME}/projects/claude-commands && \
+    ln -sf ${HOME}/.claude/skills ${HOME}/projects/claude-skills && \
+    ln -sf ${HOME}/.claude/hooks ${HOME}/projects/claude-hooks && \
+    ln -sf ${HOME}/.claude/agents ${HOME}/projects/claude-agents && \
+    ln -sf ${HOME}/.claude/todos ${HOME}/projects/claude-todos && \
+    ln -sf ${HOME}/.claude/projects ${HOME}/projects/claude-projects && \
+    ln -sf ${HOME}/.claude/session-env ${HOME}/projects/claude-sessions && \
+    ln -sf ${HOME}/.config/mcp ${HOME}/projects/mcp-config
+
+# Copy optimized settings.json template
+COPY settings.json.template ${HOME}/.claude/settings.json.template
+
+# Copy setup script
+COPY setup-claude-customizations.sh /usr/local/bin/setup-claude-customizations.sh
+RUN chmod +x /usr/local/bin/setup-claude-customizations.sh
+
+# Copy system prompt management scripts
+COPY claude-system-prompts/ ${HOME}/projects/claude-system-prompts/
+RUN chmod +x ${HOME}/projects/claude-system-prompts/scripts/*.sh
+
+# Copy custom slash commands
+COPY claude-commands/ ${HOME}/.claude/commands/
+
+# Copy README for projects directory
+COPY README-projects.md ${HOME}/projects/README.md
+
+# Set proper ownership
+RUN chown -R ${USER}:${USER} ${HOME}/projects ${HOME}/.claude
+
+# Change to user directory
+WORKDIR ${HOME}
+
+# Expose projects directory as volume for persistent customizations
+VOLUME ${HOME}/projects
+
+# Default command
+CMD ["/bin/bash"]

@@ -85,18 +85,39 @@ docker pull thornlcsw/claude-code-customized:latest
 curl -O https://raw.githubusercontent.com/codeverlan/claude-code-customized/main/.env.example
 cp .env.example .env
 
-# Configure your API token
-nano .env  # Set ANTHROPIC_AUTH_TOKEN and optionally ANTHROPIC_BASE_URL
+# Configure your settings (API token required, everything else optional)
+nano .env  # Set ANTHROPIC_AUTH_TOKEN at minimum
 
 # Run the container
 docker run -d --name claude-code \
-  -e ANTHROPIC_AUTH_TOKEN=$(grep ANTHROPIC_AUTH_TOKEN .env | cut -d'=' -f2) \
-  -e ANTHROPIC_BASE_URL=$(grep ANTHROPIC_BASE_URL .env | cut -d'=' -f2) \
+  --env-file .env \
   -v $(pwd):/workspace \
+  -v ./claude-binary:/claude-binaries:ro \
   thornlcsw/claude-code-customized:latest
 
 # Access the container
 docker exec -it claude-code bash
+```
+
+**Quick Configuration Examples:**
+```bash
+# Minimal setup (just API token)
+echo "ANTHROPIC_AUTH_TOKEN=your_token_here" > .env
+
+# Custom user and directories
+cat >> .env << EOF
+CONTAINER_USER=myuser
+PROJECTS_DIR=/data/my-projects
+CONTAINER_WORK_DIR=/data/workspace
+EOF
+
+# Development mode with debugging
+cat >> .env << EOF
+CLAUDE_DEBUG_MODE=1
+CLAUDE_LOG_LEVEL=debug
+GIT_CONFIG_NAME="My Name"
+DEFAULT_EDITOR=nano
+EOF
 ```
 
 ### 2. **Docker Compose (Recommended)**
@@ -105,15 +126,29 @@ docker exec -it claude-code bash
 # Download docker-compose.yml
 curl -O https://raw.githubusercontent.com/codeverlan/claude-code-customized/main/docker-compose.yml
 
-# Configure environment
+# Configure environment (fully customizable)
 cp .env.example .env
-# Edit .env with your settings
+# Edit .env with your settings - see CONFIGURATION-GUIDE.md
 
 # Start the container
 docker-compose up -d
 
 # Access and start using Claude Code
 docker-compose exec claude-custom bash
+```
+
+**Advanced Docker Compose Usage:**
+```bash
+# Use custom environment file
+docker-compose --env-file .env.custom up -d
+
+# Override specific settings
+docker-compose up -d \
+  -e CLAUDE_DEBUG_MODE=1 \
+  -e CONTAINER_USER=myuser
+
+# Scale for multiple instances
+docker-compose up -d --scale claude-custom=2
 ```
 
 ### 3. **With Claude Code Binary**
@@ -179,38 +214,83 @@ mount /dev/sdb1 /mnt/data                # Escalates for system operations
 
 ## ⚙️ Configuration
 
-### Required Environment Variables
+### 🔧 Full Configuration System
+
+**This image is fully configurable via environment variables!**
+
+#### Quick Setup (Required Only)
 ```bash
+# Just set your API token - everything else has sensible defaults
 ANTHROPIC_AUTH_TOKEN=your_api_token_here
-ANTHROPIC_BASE_URL=https://api.anthropic.com  # Or your preferred endpoint
 ```
 
-### Supported API Providers
+#### Popular Customizations
 ```bash
-# Anthropic (Default)
-ANTHROPIC_BASE_URL=https://api.anthropic.com
+# Custom user and directories
+CONTAINER_USER=mydeveloper
+PROJECTS_DIR=/data/my-projects
+CONTAINER_WORK_DIR=/data/workspace
 
-# Alternative Providers
-ANTHROPIC_BASE_URL=https://api.z.ai/api/anthropic
-ANTHROPIC_BASE_URL=https://anyrouter.top/v1
-ANTHROPIC_BASE_URL=https://openrouter.ai/api/v1
-ANTHROPIC_BASE_URL=https://your-custom-proxy.com/v1
-```
+# Performance tuning
+CLAUDE_AUTO_COMPACT_BUFFER_RATIO=0.03
+CLAUDE_CONTEXT_AUTOCOMPACT_TARGET=3%
 
-### Performance Tuning
-```bash
-# Context Optimization
-CLAUDE_AUTO_COMPACT_BUFFER_RATIO=0.05
-CLAUDE_CONTEXT_AUTOCOMPACT_TARGET=5%
-
-# Permission Management
-CLAUDE_SUDO_ESCALATION_ENABLED=1
-CLAUDE_AUTO_ESCALATE_ON_PERMISSION_ERROR=1
-CLAUDE_SUDO_TIMEOUT=30
-
-# Debugging (Optional)
+# Development mode
 CLAUDE_DEBUG_MODE=1
-CLAUDE_LOG_LEVEL=debug
+CLAUDE_PERFORMANCE_MONITORING=1
+GIT_CONFIG_NAME="Your Name"
+
+# Resource limits
+MEMORY_LIMIT=8g
+CPU_LIMIT=4
+
+# API providers (choose one)
+ANTHROPIC_BASE_URL=https://api.anthropic.com          # Official
+ANTHROPIC_BASE_URL=https://api.z.ai/api/anthropic     # Z.AI Proxy
+ANTHROPIC_BASE_URL=https://openrouter.ai/api/v1       # OpenRouter
+ANTHROPIC_BASE_URL=https://your-proxy.com/v1          # Custom Proxy
+```
+
+#### **Complete Configuration Reference**
+👉 **See [CONFIGURATION-GUIDE.md](https://github.com/codeverlan/claude-code-customized/blob/main/CONFIGURATION-GUIDE.md)** for **50+ configurable options** including:
+
+- **User & Directory Settings** - Custom usernames, home directories, project locations
+- **Mount Points & Volumes** - Configure where files are mounted and stored
+- **API Configuration** - Multiple providers, timeouts, retry logic
+- **Performance Tuning** - Memory optimization, context management
+- **Permission Management** - Sudo escalation settings and security
+- **Development Tools** - Git integration, debugging, monitoring
+- **Network & Security** - Proxies, SSL, resource limits
+- **Integration Settings** - Editors, tools, backup systems
+
+### Example Configurations
+
+#### Development Environment
+```bash
+CONTAINER_USER=developer
+PROJECTS_DIR=/data/claude-projects
+CLAUDE_DEBUG_MODE=1
+GIT_CONFIG_NAME="John Developer"
+MEMORY_LIMIT=8g
+CPU_LIMIT=4
+```
+
+#### Production Environment
+```bash
+CLAUDE_SUDO_ESCALATION_ENABLED=0
+SECURE_MODE=1
+AUDIT_LOGGING=1
+BACKUP_ENABLED=1
+MEMORY_LIMIT=2g
+CPU_LIMIT=1
+```
+
+#### Corporate Environment
+```bash
+ANTHROPIC_BASE_URL=https://proxy.company.com/anthropic
+HTTP_PROXY=http://proxy.company.com:8080
+CONTAINER_USER=corp-user
+PROJECTS_DIR=/shared/claude-projects
 ```
 
 ## 🔧 Development Features

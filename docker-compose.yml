@@ -12,44 +12,129 @@ services:
     container_name: claude-code-workspace
     stdin_open: true
     tty: true
-    working_dir: /workspace
+
+    # Working directory (configurable)
+    working_dir: ${CONTAINER_WORK_DIR:-/workspace}
+
     environment:
+      # API Configuration (Required)
       - ANTHROPIC_AUTH_TOKEN=${ANTHROPIC_AUTH_TOKEN}
       - ANTHROPIC_BASE_URL=${ANTHROPIC_BASE_URL:-https://api.anthropic.com}
-      - CLAUDE_DEFAULT_BASE_PROMPT=base/core-enhancement.md
-      - CLAUDE_AUTO_COMPACT_BUFFER_RATIO=0.05
-      - CLAUDE_CONTEXT_AUTOCOMPACT_TARGET=5%
-      - CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1
-      - CLAUDE_CODE_SESSION=1
-      - CLAUDE_CODE_ENTRYPOINT=cli
-      - CLAUDECODE=1
+
+      # User & Directory Configuration
+      - CONTAINER_USER=${CONTAINER_USER:-claude}
+      - CONTAINER_GROUP=${CONTAINER_GROUP:-claude}
+      - CONTAINER_UID=${CONTAINER_UID:-1000}
+      - CONTAINER_GID=${CONTAINER_GID:-1000}
+      - CONTAINER_HOME_DIR=${CONTAINER_HOME_DIR:-/home/claude}
+      - CONTAINER_WORK_DIR=${CONTAINER_WORK_DIR:-/workspace}
+      - PROJECTS_DIR=${PROJECTS_DIR:-/home/claude/projects}
+      - CLAUDE_CONFIG_DIR=${CLAUDE_CONFIG_DIR:-/home/claude/.claude}
+      - LOCAL_BIN_DIR=${LOCAL_BIN_DIR:-/home/claude/.local/bin}
+      - SYSTEM_PROMPT_DIR=${SYSTEM_PROMPT_DIR:-/home/claude/projects/claude-system-prompts}
+
+      # Mount Points
+      - CLAUDE_BINARY_MOUNT_POINT=${CLAUDE_BINARY_MOUNT_POINT:-/claude-binaries}
+      - HOST_WORK_DIR=${HOST_WORK_DIR:-.}
+
+      # Claude Code Configuration
+      - CLAUDE_CODE_SESSION=${CLAUDE_CODE_SESSION:-1}
+      - CLAUDE_CODE_ENTRYPOINT=${CLAUDE_CODE_ENTRYPOINT:-cli}
+      - CLAUDECODE=${CLAUDECODE:-1}
+
+      # System Prompt Configuration
+      - CLAUDE_DEFAULT_BASE_PROMPT=${CLAUDE_DEFAULT_BASE_PROMPT:-base/core-enhancement.md}
+      - DEFAULT_APPEND_PROMPTS=${DEFAULT_APPEND_PROMPTS:-}
+
+      # Performance Optimization
+      - CLAUDE_AUTO_COMPACT_BUFFER_RATIO=${CLAUDE_AUTO_COMPACT_BUFFER_RATIO:-0.05}
+      - CLAUDE_CONTEXT_AUTOCOMPACT_TARGET=${CLAUDE_CONTEXT_AUTOCOMPACT_TARGET:-5%}
+      - CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=${CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:-1}
+
+      # Permission Escalation
+      - CLAUDE_SUDO_ESCALATION_ENABLED=${CLAUDE_SUDO_ESCALATION_ENABLED:-1}
+      - CLAUDE_AUTO_ESCALATE_ON_PERMISSION_ERROR=${CLAUDE_AUTO_ESCALATE_ON_PERMISSION_ERROR:-1}
+      - CLAUDE_SUDO_TIMEOUT=${CLAUDE_SUDO_TIMEOUT:-30}
+      - CLAUDE_MAX_ESCALATION_RETRIES=${CLAUDE_MAX_ESCALATION_RETRIES:-2}
+
+      # API Configuration
+      - API_TIMEOUT_MS=${API_TIMEOUT_MS:-300000}
+      - API_MAX_RETRIES=${API_MAX_RETRIES:-3}
+      - API_RETRY_DELAY_MS=${API_RETRY_DELAY_MS:-1000}
+
+      # Development & Debugging
+      - CLAUDE_DEBUG_MODE=${CLAUDE_DEBUG_MODE:-0}
+      - CLAUDE_LOG_LEVEL=${CLAUDE_LOG_LEVEL:-info}
+      - CLAUDE_PERFORMANCE_MONITORING=${CLAUDE_PERFORMANCE_MONITORING:-0}
+
+      # Integration Settings
+      - GIT_ENABLED=${GIT_ENABLED:-1}
+      - DOCKER_INTEGRATION=${DOCKER_INTEGRATION:-1}
+      - DEFAULT_EDITOR=${DEFAULT_EDITOR:-vim}
+
+      # Security Settings
+      - SECURE_MODE=${SECURE_MODE:-0}
+      - AUDIT_LOGGING=${AUDIT_LOGGING:-0}
+
+      # Network Settings
+      - CONTAINER_NETWORK=${CONTAINER_NETWORK:-claude-network}
+
     volumes:
       # Mount your Claude binary (Linux binary required)
-      - ./claude-binary:/claude-binaries:ro
+      - ${CLAUDE_BINARY_DIR:-./claude-binary}:${CLAUDE_BINARY_MOUNT_POINT:-/claude-binaries}:ro
 
       # Mount your working directory
-      - .:/workspace
+      - ${HOST_WORK_DIR:-.}:${CONTAINER_WORK_DIR:-/workspace}
 
       # Optional: Mount host Claude configurations
-      - ~/.claude:/host-claude:ro
+      - ${HOST_CLAUDE_CONFIG:-~/.claude}:/host-claude:ro
 
-      # Persist customizations
-      - claude-customizations:/home/claude/projects
+      # Persist customizations and projects
+      - ${PROJECTS_VOLUME_NAME:-claude-code-projects}:${PROJECTS_DIR:-/home/claude/projects}
+      - ${CONFIG_VOLUME_NAME:-claude-code-config}:${CLAUDE_CONFIG_DIR:-/home/claude/.claude}
+      - ${MCP_VOLUME_NAME:-claude-code-mcp}:/home/claude/.config/mcp
+
+      # Optional: Mount custom scripts directory
+      - ${CUSTOM_SCRIPTS_DIR:-./scripts}:/custom-scripts:ro
 
     ports:
-      - "8080:8080"  # If using web-based tools
+      - "${EXPOSED_PORTS:-8080}:8080"  # If using web-based tools
 
     restart: unless-stopped
 
-    # Health check
+    # Health check (configurable paths)
     healthcheck:
-      test: ["CMD", "/bin/bash", "-c", "test -f /home/claude/.local/bin/claude && test -d /home/claude/projects"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
+      test: ["CMD", "/bin/bash", "-c", "test -f ${LOCAL_BIN_DIR:-/home/claude/.local/bin}/claude && test -d ${PROJECTS_DIR:-/home/claude/projects}"]
+      interval: ${HEALTH_CHECK_INTERVAL:-30s}
+      timeout: ${HEALTH_CHECK_TIMEOUT:-10s}
+      retries: ${HEALTH_CHECK_RETRIES:-3}
+      start_period: ${HEALTH_CHECK_START_PERIOD:-10s}
+
+    # Resource limits (configurable)
+    deploy:
+      resources:
+        limits:
+          memory: ${MEMORY_LIMIT:-4g}
+          cpus: '${CPU_LIMIT:-2}'
+        reservations:
+          memory: ${MEMORY_RESERVATION:-2g}
+          cpus: '${CPU_RESERVATION:-1}'
 
 volumes:
-  claude-customizations:
+  # Named volumes for persistence
+  ${PROJECTS_VOLUME_NAME:-claude-code-projects}:
     driver: local
-    name: claude-code-customizations
+    name: ${PROJECTS_VOLUME_NAME:-claude-code-projects}
+
+  ${CONFIG_VOLUME_NAME:-claude-code-config}:
+    driver: local
+    name: ${CONFIG_VOLUME_NAME:-claude-code-config}
+
+  ${MCP_VOLUME_NAME:-claude-code-mcp}:
+    driver: local
+    name: ${MCP_VOLUME_NAME:-claude-code-mcp}
+
+# Optional: Network configuration
+networks:
+  default:
+    name: ${CONTAINER_NETWORK:-claude-network}
